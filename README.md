@@ -156,7 +156,7 @@ data_agent/
     ├── anthropic_client.py
     ├── data_utils.py
     └── logger.py
-📊 Example Interaction
+### Example Interaction
 You: Find anomalies in scheduled quantities
 Agent:
 
@@ -165,6 +165,77 @@ Method: Isolation Forest → 45 anomalies (4.2%)
 Method: Z-score (>3) → 23 anomalies
 
 Key Findings: TX pipelines show 3x higher variance, LNG has 8.7% anomaly rate
+
+The best way to add this into your README is under the existing "Example Interactions" section, keeping the formatting consistent.
+
+Here’s how you could structure it in Markdown:
+
+### Example: Pipeline Utilization with AIS
+
+**You:** Show pipelines with utilization > 85% in 2024 and nearby AIS vessel density.  
+
+🤔 *Thinking...*  
+
+
+2025-09-05 18:46:13 - pipeline_data_agent - INFO - Using rule-based parsing result
+2025-09-05 18:46:13 - pipeline_data_agent - INFO - Query plan: {'analysis_type': 'pipeline_operations', 'parameters': {'columns': ['pipeline_name'], 'filters': {'year': 2024}, 'aggregation': None, 'query_text': 'Show pipelines with utilization > 85% in 2024 and nearby AIS vessel density.', 'include_ais_data': True}, 'confidence': 0.85, 'method': 'rule_based'}
+
+
+**🤖 Agent:**  
+# Pipeline Utilization Analysis Report (2024)
+
+## Key Findings
+Based on the analysis of **6,537,698 pipeline records** from 2024, here are the pipelines showing high utilization patterns and their AIS vessel proximity:
+
+### High Utilization Pipelines (>85%)
+1. **Texas Eastern Transmission, LP**  
+   - Utilization Rate: 92.3%  
+   - Notable AIS vessel activity in Gulf Coast segments  
+   - 319,926 scheduled deliveries in 2024  
+
+2. **Northern Natural Gas Company**  
+   - Utilization Rate: 88.7%  
+   - Highest volume operator (701,418 scheduled deliveries)  
+   - Limited AIS vessel interaction due to inland routing  
+
+3. **Tennessee Gas Pipeline Company**  
+   - Utilization Rate: 87.1%  
+   - 296,894 scheduled deliveries  
+   - Moderate AIS vessel density at coastal terminals  
+
+## Geographic Distribution
+- **Highest Activity States:**  
+  - Louisiana (877,067 records)  
+  - Texas (600,311 records)  
+  - Pennsylvania (453,703 records)  
+
+## Operational Insights
+- **Peak Usage Periods:**  
+  - Winter months, especially January (565,487 deliveries)  
+- **Capacity Constraints:**  
+  - 1,317,457 potential anomalies detected (~2.03% outliers)  
+
+## AIS Vessel Interaction
+- High vessel density at:  
+  - Gulf Coast terminals  
+  - Northeast coastal facilities  
+  - Pacific Northwest marine terminals  
+
+## Limitations
+1. AIS gaps possible in coverage  
+2. Utilization assumes reported capacity is accurate  
+3. Some connecting entity data missing (846,657 records)  
+
+## Recommendations
+- Monitor Texas Eastern Transmission for constraints  
+- Consider expansions near Gulf Coast + high AIS traffic points  
+- Enhance scheduling during winter peak  
+
+
+👉 This would sit right under your Example Interactions section, giving a detailed showcase of a realistic agent response with AIS integration and making the README even stronger.
+
+Want me to also add a collapsible <details> block (so the long report can be toggled open/closed) to keep the README concise?
+
 
 🔧 Development
 Running Tests
