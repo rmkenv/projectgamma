@@ -2,28 +2,38 @@
 
 # Agent settings
 agent:
-  model: "claude-3-5-sonnet-20241022"  # Anthropic model to use
+  model: "claude-3-5-sonnet-20241022"   # Anthropic model to use
   max_tokens: 4000                      # Maximum tokens per response
   temperature: 0.1                      # Response randomness (0.0 = deterministic)
-  
+
 # Data settings
 data:
   cache_directory: "./data"             # Directory for cached datasets
-  auto_download_url: "https://drive.google.com/file/d/1Gtb6XcXZRzI4fy8VASUtXaZXF530JO4C/view?usp=sharing"
-  
+  prompt_for_path: true                 # Main script will prompt for dataset path
+  auto_download_url: null               # Keep null unless you have a direct file URL (not an HTML page)
+
 # Analysis settings
 analysis:
   anomaly_contamination: 0.1            # Expected fraction of anomalies (0.1 = 10%)
   clustering_min_samples: 5             # Minimum samples for DBSCAN clustering
   correlation_threshold: 0.5            # Threshold for strong correlations
   max_display_rows: 20                  # Maximum rows to display in results
-  
+
 # Logging settings
 logging:
   level: "INFO"                         # DEBUG, INFO, WARNING, ERROR
   log_file: null                        # Optional log file path
-  
+
 # Performance settings
 performance:
   max_data_size_mb: 500                 # Maximum dataset size to load
   timeout_seconds: 30                   # Timeout for analysis operations
+
+# Preprocessing (missing values, dtype, features)
+preprocessing:
+  drop_geo_if_all_missing: true
+  drop_sched_qty_missing: true          # If false, uses groupwise median imputation
+  impute_categories_with_unknown: true
+  add_missing_indicators: true
+  convert_text_to_categorical: true
+  high_missing_threshold: 0.6           # Drop columns with >60% missing
