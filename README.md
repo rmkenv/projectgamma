@@ -36,17 +36,17 @@ Optional (for pipeline operations & geospatial features):
 Set up your Anthropic API key:
 
 ```export ANTHROPIC_API_KEY="your-api-key-here"```
+
 Dataset Setup
 This agent supports CSV and Parquet files. You’ll be prompted for the dataset path at runtime.
 
 Example (Parquet on Colab):
-
 python main.py
 # When prompted, enter: /content/pipeline_data.parquet
 Example (CSV locally):
-
 python main.py
 # When prompted, enter: /path/to/your/pipeline_data.csv
+
 Tips:
 
 Use absolute paths for reliability.
