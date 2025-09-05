@@ -1,9 +1,7 @@
 Pipeline Data Analysis Agent
-
 A sophisticated AI-powered data agent that analyzes pipeline data through natural language queries, detects anomalies, identifies patterns, and provides insights with supporting evidence. Now includes advanced Pipeline Operations analytics (capacity, utilization, bottlenecks) and optional AIS vessel-traffic integration.
 
 Features
-
 🤖 Natural Language Interface: Ask questions in plain English about your pipeline data
 
 📊 Pattern Recognition: Detect trends, correlations, and clustering
@@ -23,36 +21,32 @@ Features
 Quick Start
 Installation
 Clone this repository:
+
 git clone https://github.com/rmkenv/projectgamma
 cd projectgamma
-
 Install dependencies:
+
 pip install -r requirements.txt
-
-
 Note: For Parquet datasets, pandas uses pyarrow (recommended). Ensure pyarrow is installed via requirements.txt.
 
 Optional (for pipeline operations & geospatial features):
 
 # Geospatial stack (recommended for spatial joins/buffer operations)
 pip install geopandas shapely rtree
-
 Set up your Anthropic API key:
+
 export ANTHROPIC_API_KEY="your-api-key-here"
-
 Dataset Setup
-
 This agent supports CSV and Parquet files. You’ll be prompted for the dataset path at runtime.
 
 Example (Parquet on Colab):
+
 python main.py
 # When prompted, enter: /content/pipeline_data.parquet
-
 Example (CSV locally):
+
 python main.py
 # When prompted, enter: /path/to/your/pipeline_data.csv
-
-
 Tips:
 
 Use absolute paths for reliability.
@@ -63,14 +57,10 @@ If fetching from Google Drive, download the actual file (not the HTML share page
 
 pip install gdown
 gdown https://drive.google.com/uc?id=<FILE_ID>
-
 Usage
-
 Start the agent:
 
 python main.py
-
-
 Example queries you can try:
 
 Simple Retrieval:
@@ -128,7 +118,6 @@ Pipeline Ops with AIS (NEW):
 Tip: Include words like "tanker", "vessel", "AIS", or "shipping" to auto-enable AIS in the query.
 
 Dataset Information
-
 The pipeline dataset may include:
 
 pipeline_name: Name of the pipeline
@@ -156,7 +145,6 @@ eff_gas_day: Effective gas day (date)
 scheduled_quantity: Scheduled gas quantity
 
 Configuration
-
 You can customize behavior in config/config.yaml:
 
 agent:
@@ -182,8 +170,6 @@ pipeline_analytics:
   max_tanker_distance_km: 20
   ais_stream_duration: 30
   enable_ais_integration: false
-
-
 Notes:
 
 The default main.py prompts for a local dataset path. If you re-enable auto-download, ensure the URL points directly to the file (or use gdown for Drive).
@@ -206,7 +192,6 @@ data_agent/
     ├── anthropic_client.py    # Anthropic API client
     ├── data_utils.py          # Data utility functions
     └── logger.py              # Logging configuration
-
 Example Interactions
 🤖 Pipeline Data Agent Ready! Ask me anything about your pipeline data.
 
@@ -237,9 +222,7 @@ Key Findings:
 - Category 'LNG' shows the highest anomaly rate (8.7%)
 
 Would you like me to investigate any specific anomalies further?
-
 Advanced Features
-
 Multi-step Analysis:
 
 The agent chains steps (e.g., detect anomalies → cluster geography → test spatial correlation) for complex questions.
@@ -263,7 +246,6 @@ Flow-direction anomaly checks
 Optional AIS overlay to enrich context around terminals and high-traffic regions
 
 Prerequisites & Performance
-
 Large Datasets: For 20M+ rows, enable preprocessing optimizations (categoricals, selective columns, chunking if needed). Memory use is surfaced in summaries.
 
 Geospatial: geopandas, shapely, and rtree (optional) improve spatial operations. Without them, AIS/spatial features gracefully degrade to simpler proximity checks.
@@ -271,7 +253,6 @@ Geospatial: geopandas, shapely, and rtree (optional) improve spatial operations.
 AIS: Set enable_ais_integration: true and mention "tanker", "vessel", "AIS", or "shipping" in your query.
 
 Limitations
-
 Data Quality: Results depend on data quality; missing/inconsistent data are surfaced.
 
 Causality: Causal statements are hypotheses, not proofs.
@@ -283,7 +264,6 @@ API Costs: Complex analyses may require multiple API calls.
 Real-time Streams: Continuous AIS can be resource-intensive; set sensible durations.
 
 Troubleshooting
-
 "No API key found"
 
 Ensure ANTHROPIC_API_KEY is set in your environment
@@ -307,10 +287,10 @@ Use gdown or obtain a direct download link
 Performance Issues
 
 For very large datasets, consider sampling or selecting columns in your query
+
 Development
 Running Tests
 pytest tests/
-
 Code Quality
 # Format code
 black data_agent/
@@ -320,9 +300,7 @@ mypy data_agent/
 
 # Linting
 flake8 data_agent/
-
 Adding New Analysis Methods
-
 Add your method to analysis_engine.py (or analysis/pipeline_analytics.py for pipeline ops)
 
 Update query_parser.py to recognize relevant keywords/intent
@@ -332,7 +310,6 @@ Add appropriate response models
 Write tests
 
 Contributing
-
 Fork the repository
 
 Create a feature branch
@@ -344,5 +321,4 @@ Ensure code quality checks pass
 Submit a pull request
 
 License
-
 MIT License - see LICENSE file for details.
