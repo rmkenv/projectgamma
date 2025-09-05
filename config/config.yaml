@@ -37,3 +37,12 @@ preprocessing:
   add_missing_indicators: true
   convert_text_to_categorical: true
   high_missing_threshold: 0.6           # Drop columns with >60% missing
+
+  # Pipeline Analytics Settings
+pipeline_analytics:
+  utilization_threshold: 0.85           # High utilization threshold for bottlenecks
+  bottleneck_window_days: 30            # Rolling window for bottleneck detection
+  bottleneck_min_days: 10               # Minimum high-util days to flag bottleneck
+  max_tanker_distance_km: 20            # Max distance to associate tankers with pipelines
+  ais_stream_duration: 30               # Seconds to collect AIS data
+  enable_ais_integration: false         # Enable real-time AIS data collection
