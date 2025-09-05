@@ -1,6 +1,6 @@
-"""
+""
 Core agent class that orchestrates data analysis through natural language queries.
-"""
+""
 
 import os
 import asyncio
@@ -129,7 +129,7 @@ class PipelineDataAgent:
         cache_dir = Path(self.config["data"]["cache_directory"])
         cache_dir.mkdir(exist_ok=True)
         
-        dataset_path = cache_dir / "pipeline_data.csv"
+        dataset_path = cache_dir / "pipeline_data.parquet"
         
         # Check if already cached
         if dataset_path.exists():
