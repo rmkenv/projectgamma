@@ -1,6 +1,4 @@
-
 # Natural language query parsing and intent recognition.
-
 
 import re
 from typing import Dict, Any, List, Optional
@@ -22,7 +20,7 @@ class QueryParser:
         """Initialize query parser with Anthropic client."""
         self.anthropic_client = anthropic_client
         
-        # Keywords for different analysis types
+        # Keywords for different analysis types (stemmed/partial forms are fine)
         self.analysis_keywords = {
             'anomaly_detection': [
                 'anomal', 'outlier', 'unusual', 'strange', 'weird', 'abnormal',
@@ -34,7 +32,7 @@ class QueryParser:
             ],
             'correlation_analysis': [
                 'correlat', 'relationship', 'association', 'connect', 'relate',
-                'compare', 'vs', 'versus', 'against', 'between'
+                'compare', ' vs ', 'versus', ' against ', ' between '
             ],
             'clustering': [
                 'cluster', 'group', 'segment', 'categor', 'classify',
@@ -51,8 +49,18 @@ class QueryParser:
             'causal_analysis': [
                 'why', 'cause', 'reason', 'explain', 'because', 'due to',
                 'factor', 'influence', 'impact', 'effect'
+            ],
+            # New: pipeline operations (capacity/utilization/bottlenecks/AIS)
+            'pipeline_operations': [
+                'bottleneck', 'capacity', 'utilization', 'utilisation',
+                'flow direction', 'reverse flow', 'pipeline efficiency',
+                'throughput', 'constraint', 'choke point',
+                'tanker', 'vessel', 'ais', 'shipping'
             ]
         }
+
+        # Fast lookup set for AIS toggling
+        self._ais_keywords = {'tanker', 'vessel', 'ais', 'shipping'}
     
     async def parse_query(self, user_query: str, column_info: Dict[str, Any], 
                          conversation_history: List[Dict[str, str]] = None) -> Dict[str, Any]:
@@ -67,17 +75,27 @@ class QueryParser:
         Returns:
             Dictionary containing analysis type and parameters
         """
-        
         try:
             # First, try rule-based parsing for simple cases
             rule_based_result = self._rule_based_parsing(user_query, column_info)
             
+            # If we detected pipeline_operations, ensure AIS flag is surfaced
+            if rule_based_result and rule_based_result.get('analysis_type') == 'pipeline_operations':
+                include_ais = any(k in user_query.lower() for k in self._ais_keywords)
+                rule_based_result['parameters']['include_ais_data'] = include_ais
+
             if rule_based_result and rule_based_result.get('confidence', 0) > 0.8:
                 logger.info("Using rule-based parsing result")
                 return rule_based_result
             
             # For complex queries, use LLM-based parsing
             llm_result = await self._llm_based_parsing(user_query, column_info, conversation_history)
+
+            # If LLM chose pipeline_operations, add AIS inference too
+            if llm_result and llm_result.get('analysis_type') == 'pipeline_operations':
+                params = llm_result.setdefault('parameters', {})
+                include_ais = any(k in user_query.lower() for k in self._ais_keywords)
+                params['include_ais_data'] = include_ais
             
             # Combine results if needed
             if rule_based_result and llm_result:
@@ -108,25 +126,29 @@ class QueryParser:
         aggregation = self._extract_aggregation_type(query_lower)
         
         # Calculate confidence based on matches
-        confidence = self._calculate_confidence(query_lower, analysis_type, mentioned_columns)
+        confidence = self._calculate_confidence(query_lower, analysis_type, mentioned_columns, filters, aggregation)
+        
+        params: Dict[str, Any] = {
+            'columns': mentioned_columns,
+            'filters': filters,
+            'aggregation': aggregation,
+            'query_text': query
+        }
+
+        # If pipeline ops, add AIS inference here as well
+        if analysis_type == 'pipeline_operations':
+            params['include_ais_data'] = any(k in query_lower for k in self._ais_keywords)
         
         return {
             'analysis_type': analysis_type,
-            'parameters': {
-                'columns': mentioned_columns,
-                'filters': filters,
-                'aggregation': aggregation,
-                'query_text': query
-            },
+            'parameters': params,
             'confidence': confidence,
             'method': 'rule_based'
         }
     
     def _detect_analysis_type(self, query_lower: str) -> str:
         """Detect the type of analysis based on keywords."""
-        
         type_scores = {}
-        
         for analysis_type, keywords in self.analysis_keywords.items():
             score = sum(1 for keyword in keywords if keyword in query_lower)
             if score > 0:
@@ -140,7 +162,6 @@ class QueryParser:
     
     def _extract_column_references(self, query_lower: str, column_info: Dict[str, Any]) -> List[str]:
         """Extract column names mentioned in the query."""
-        
         mentioned_columns = []
         
         # Check for exact column name matches
@@ -163,10 +184,7 @@ class QueryParser:
     
     def _get_column_aliases(self, column_name: str) -> List[str]:
         """Get alternative names/aliases for a column."""
-        
         aliases = [column_name]
-        
-        # Common aliases for specific columns
         alias_map = {
             'scheduled_quantity': ['quantity', 'amount', 'volume', 'scheduled'],
             'pipeline_name': ['pipeline', 'name'],
@@ -179,47 +197,43 @@ class QueryParser:
             'category_short': ['category', 'type', 'cat'],
             'loc_name': ['location', 'place']
         }
-        
         if column_name in alias_map:
             aliases.extend(alias_map[column_name])
-        
         return aliases
     
     def _extract_filters(self, query_lower: str, column_info: Dict[str, Any]) -> Dict[str, Any]:
         """Extract filter conditions from the query."""
-        
-        filters = {}
-        
-        # Look for state/country filters
-        state_pattern = r'in (\w+)|from (\w+)|(\w+) state|(\w+) pipelines?'
-        state_matches = re.findall(state_pattern, query_lower)
-        
-        for match in state_matches:
-            state = next((s for s in match if s), None)
-            if state and len(state) == 2:  # Likely state abbreviation
+        filters: Dict[str, Any] = {}
+
+        # State: capture two-letter codes after 'in', 'from', or before 'state'
+        # e.g., "in TX", "from PA", "TX state pipelines"
+        state_matches = re.findall(r'(?:in|from)\s+([a-z]{2})\b|([a-z]{2})\s+state', query_lower)
+        for sm in state_matches:
+            state = next((s for s in sm if s), None)
+            if state and len(state) == 2:
                 filters['state_abb'] = state.upper()
-        
-        # Look for year filters
-        year_pattern = r'20\d{2}|in (\d{4})'
-        year_matches = re.findall(year_pattern, query_lower)
-        if year_matches:
-            year = year_matches[0] if isinstance(year_matches[0], str) else year_matches[0][0]
-            if year:
-                filters['year'] = int(year)
-        
-        # Look for category filters
-        category_pattern = r'category (\w+)|type (\w+)'
-        category_matches = re.findall(category_pattern, query_lower)
+
+        # Year: "in 2023", "since 2022", or bare 20xx/19xx
+        ym = re.findall(r'(?:in|since|for)\s+(19|20)\d{2}|\b(19|20)\d{2}\b', query_lower)
+        if ym:
+            # ym is list of tuples; flatten to the first full 4-digit token found in query
+            year_match = re.search(r'\b(19|20)\d{2}\b', query_lower)
+            if year_match:
+                filters['year'] = int(year_match.group(0))
+
+        # Categories: "category X" or "type Y"
+        category_matches = re.findall(r'(?:category|type)\s+([a-z0-9_]+)', query_lower)
         if category_matches:
-            category = next((c for match in category_matches for c in match if c), None)
-            if category:
-                filters['category_short'] = category.upper()
-        
+            filters['category_short'] = category_matches[0].upper()
+
+        # Simple direction hints -> flow direction analysis (optional flag)
+        if 'reverse flow' in query_lower or 'flow direction' in query_lower:
+            filters['flow_direction_focus'] = True
+
         return filters
     
     def _extract_aggregation_type(self, query_lower: str) -> Optional[str]:
         """Extract aggregation type from query."""
-        
         if any(word in query_lower for word in ['count', 'how many', 'number of']):
             return 'count'
         elif any(word in query_lower for word in ['average', 'mean']):
@@ -232,53 +246,64 @@ class QueryParser:
             return 'min'
         elif 'median' in query_lower:
             return 'median'
-        
         return None
     
-    def _calculate_confidence(self, query_lower: str, analysis_type: str, columns: List[str]) -> float:
+    def _calculate_confidence(self, query_lower: str, analysis_type: str, columns: List[str],
+                              filters: Dict[str, Any], aggregation: Optional[str]) -> float:
         """Calculate confidence score for rule-based parsing."""
-        
         confidence = 0.0
         
         # Base confidence for analysis type detection
         if analysis_type != 'general_analysis':
-            confidence += 0.3
+            confidence += 0.35
         
         # Confidence boost for column detection
         if columns:
-            confidence += 0.4
+            confidence += 0.35
+
+        # Confidence boost for filters/aggregation presence
+        if filters:
+            confidence += 0.15
+        if aggregation:
+            confidence += 0.1
         
-        # Confidence boost for specific keywords
-        specific_keywords = ['show', 'find', 'count', 'how many', 'list', 'anomal', 'correlat']
-        keyword_matches = sum(1 for keyword in specific_keywords if keyword in query_lower)
-        confidence += min(0.3, keyword_matches * 0.1)
-        
+        # Cap at 1.0
         return min(1.0, confidence)
     
     async def _llm_based_parsing(self, user_query: str, column_info: Dict[str, Any], 
-                                conversation_history: List[Dict[str, str]] = None) -> Dict[str, Any]:
+                                conversation_history: List[Dict[str, str]] = None) -> Optional[Dict[str, Any]]:
         """Use LLM to parse complex queries."""
-        
-        # Create context for the LLM
         context = self._build_parsing_context(user_query, column_info, conversation_history)
-        
-        # Generate parsing prompt
         parsing_prompt = self._create_parsing_prompt(context)
         
         try:
-            # Get LLM response
+            # Get LLM response. The client may return a string or an object with .content
             response = await self.anthropic_client.complete(
                 messages=[{"role": "user", "content": parsing_prompt}],
-                max_tokens=1000,
+                max_tokens=800,
                 temperature=0.1
             )
-            
-            # Parse the JSON response
-            result = json.loads(response)
-            
+
+            # Normalize response to string
+            if isinstance(response, str):
+                raw = response
+            elif isinstance(response, dict):
+                # Some clients wrap under 'content' or 'completion'
+                raw = response.get('content') or response.get('completion') or json.dumps(response)
+            else:
+                # Try attribute access
+                raw = getattr(response, 'content', None) or getattr(response, 'completion', None)
+                if raw is None:
+                    raw = str(response)
+
+            # If Anthropic returns a list of content blocks, join their text
+            if isinstance(raw, list):
+                raw = ''.join([blk.get('text', '') if isinstance(blk, dict) else str(blk) for blk in raw])
+
+            result = json.loads(raw)
+
             # Validate the result
             validated_result = self._validate_parsing_result(result, column_info)
-            
             return validated_result
             
         except Exception as e:
@@ -288,11 +313,10 @@ class QueryParser:
     def _build_parsing_context(self, user_query: str, column_info: Dict[str, Any], 
                               conversation_history: List[Dict[str, str]] = None) -> Dict[str, Any]:
         """Build context information for LLM parsing."""
-        
-        # Column information summary
         columns_summary = []
         for col_name, info in column_info.items():
-            col_desc = f"{col_name} ({info['dtype']})"
+            dtype = info.get('dtype', 'unknown')
+            col_desc = f"{col_name} ({dtype})"
             if info.get('unique_count', 0) < 20 and 'value_counts' in info:
                 examples = list(info['value_counts'].keys())[:5]
                 col_desc += f" - examples: {examples}"
@@ -303,12 +327,10 @@ class QueryParser:
             'available_columns': columns_summary,
             'conversation_history': conversation_history or []
         }
-        
         return context
     
     def _create_parsing_prompt(self, context: Dict[str, Any]) -> str:
         """Create a prompt for LLM-based query parsing."""
-        
         prompt = f"""You are a data analysis query parser. Parse the user's natural language query into a structured analysis plan.
 
 Available dataset columns:
@@ -321,7 +343,7 @@ Recent conversation context:
 
 Analyze the query and respond with a JSON object containing:
 {{
-  "analysis_type": "one of: simple_query, anomaly_detection, pattern_analysis, correlation_analysis, statistical_summary, clustering, causal_analysis, general_analysis",
+  "analysis_type": "one of: simple_query, anomaly_detection, pattern_analysis, correlation_analysis, statistical_summary, clustering, causal_analysis, pipeline_operations, general_analysis",
   "parameters": {{
     "columns": ["list of relevant column names"],
     "filters": {{"column_name": "filter_value or condition"}},
@@ -340,40 +362,52 @@ Focus on:
 4. Understanding the scope of analysis
 
 Respond only with valid JSON."""
-        
         return prompt
     
     def _validate_parsing_result(self, result: Dict[str, Any], column_info: Dict[str, Any]) -> Dict[str, Any]:
         """Validate and clean the parsing result from LLM."""
+        if not isinstance(result, dict):
+            return self._default_analysis_plan(str(result))
         
         # Ensure required fields exist
-        if 'analysis_type' not in result:
-            result['analysis_type'] = 'general_analysis'
-        
-        if 'parameters' not in result:
-            result['parameters'] = {}
+        result.setdefault('analysis_type', 'general_analysis')
+        params = result.setdefault('parameters', {})
         
         # Validate column names
-        if 'columns' in result['parameters']:
+        cols = params.get('columns', [])
+        if cols and isinstance(cols, list):
             valid_columns = []
-            for col in result['parameters']['columns']:
+            for col in cols:
                 if col in column_info:
                     valid_columns.append(col)
                 else:
-                    # Try to find closest match
                     closest = self._find_closest_column(col, column_info)
                     if closest:
                         valid_columns.append(closest)
-            result['parameters']['columns'] = valid_columns
+            params['columns'] = list(dict.fromkeys(valid_columns))  # dedupe while preserving order
         
-        # Add method indicator
+        # Ensure filters exist as dict
+        if 'filters' in params and not isinstance(params['filters'], dict):
+            params['filters'] = {}
+        
+        # If LLM detected pipeline ops, infer AIS inclusion
+        if result.get('analysis_type') == 'pipeline_operations':
+            include_ais = any(k in params.get('analysis_focus', '').lower() for k in self._ais_keywords)
+            # Also consider the original query text if present
+            qtext = params.get('query_text', '')
+            if not include_ais and isinstance(qtext, str):
+                include_ais = any(k in qtext.lower() for k in self._ais_keywords)
+            params['include_ais_data'] = params.get('include_ais_data', include_ais)
+
+        result['parameters'] = params
         result['method'] = 'llm_based'
-        
         return result
     
     def _find_closest_column(self, target: str, column_info: Dict[str, Any]) -> Optional[str]:
         """Find the closest matching column name."""
-        
+        if not target:
+            return None
+
         target_lower = target.lower()
         
         # Direct match
@@ -396,8 +430,6 @@ Respond only with valid JSON."""
     
     def _merge_parsing_results(self, rule_based: Dict[str, Any], llm_based: Dict[str, Any]) -> Dict[str, Any]:
         """Merge rule-based and LLM-based parsing results."""
-        
-        # Start with LLM result as base
         merged = llm_based.copy()
         
         # Override with high-confidence rule-based insights
@@ -406,24 +438,26 @@ Respond only with valid JSON."""
                 merged['analysis_type'] = rule_based['analysis_type']
             
             # Merge parameters
+            merged_params = merged.setdefault('parameters', {})
             rule_params = rule_based.get('parameters', {})
-            if rule_params.get('columns'):
-                merged['parameters']['columns'] = list(set(
-                    merged['parameters'].get('columns', []) + rule_params['columns']
-                ))
             
+            if rule_params.get('columns'):
+                merged_params['columns'] = list(set(
+                    merged_params.get('columns', []) + rule_params['columns']
+                ))
             if rule_params.get('filters'):
-                merged['parameters']['filters'] = {
-                    **merged['parameters'].get('filters', {}),
+                merged_params['filters'] = {
+                    **merged_params.get('filters', {}),
                     **rule_params['filters']
                 }
+            if 'include_ais_data' in rule_params:
+                merged_params['include_ais_data'] = rule_params['include_ais_data']
         
         merged['method'] = 'hybrid'
         return merged
     
     def _default_analysis_plan(self, user_query: str) -> Dict[str, Any]:
         """Create a default analysis plan when parsing fails."""
-        
         return {
             'analysis_type': 'general_analysis',
             'parameters': {
