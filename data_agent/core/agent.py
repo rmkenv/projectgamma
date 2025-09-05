@@ -19,7 +19,6 @@ from ..utils.logger import get_logger
 console = Console()
 logger = get_logger()
 
-
 class PipelineDataAgent:
     """
     Main agent class that coordinates data analysis through natural language queries.
@@ -174,16 +173,11 @@ class PipelineDataAgent:
         formatted_info = f"""📊 **Dataset Overview**
         
 **Shape:** {info['shape']['rows']:,} rows × {info['shape']['columns']} columns
-
 **Columns:** {', '.join(info['columns'])}
-
 **Data Types:**
 {chr(10).join([f"• {col}: {dtype}" for col, dtype in info['dtypes'].items()])}
-
 **Missing Values:** {info['missing_values']} total
-
 **Memory Usage:** {info['memory_usage']}
-
 **Date Range:** {info.get('date_range', 'No date column found')}
         """
         
