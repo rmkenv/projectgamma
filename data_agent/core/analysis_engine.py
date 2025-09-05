@@ -1,6 +1,5 @@
-"""
-Advanced analysis engine for statistical analysis, anomaly detection, and pattern recognition.
-"""
+
+# Advanced analysis engine for statistical analysis, anomaly detection, and pattern recognition.
 
 import pandas as pd
 import numpy as np
