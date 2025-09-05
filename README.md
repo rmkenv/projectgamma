@@ -22,8 +22,9 @@ A sophisticated AI-powered data agent that analyzes pipeline data through natura
 Installation
 Clone this repository:
 
-git clone https://github.com/rmkenv/projectgamma
-cd projectgamma
+```git clone https://github.com/rmkenv/projectgamma
+cd projectgamma```
+
 Install dependencies:
 
 pip install -r requirements.txt
