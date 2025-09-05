@@ -1,6 +1,6 @@
-"""
+""
 Data processing and loading utilities for pipeline datasets.
-"""
+""
 
 import pandas as pd
 import numpy as np
@@ -36,8 +36,8 @@ class DataProcessor:
         try:
             logger.info(f"Loading data from {self.dataset_path}")
             
-            # Load the CSV file
-            self.data = pd.read_csv(self.dataset_path)
+            # Auto-detect loader based on extension and content
+            self.data = self._read_dataset(self.dataset_path)
             self.original_data = self.data.copy()
             
             logger.info(f"Loaded {len(self.data)} rows and {len(self.data.columns)} columns")
@@ -53,6 +53,38 @@ class DataProcessor:
         except Exception as e:
             logger.error(f"Failed to load data: {e}")
             raise
+
+    def _read_dataset(self, path: Path) -> pd.DataFrame:
+        """
+        Read CSV or Parquet (optionally Excel) based on file extension.
+        Also protects against accidentally downloading an HTML page.
+        """
+        path = Path(path)
+        if not path.exists():
+            raise FileNotFoundError(f"Dataset not found: {path}")
+
+        suffix = path.suffix.lower()
+
+        # Quick guard: detect HTML masquerading as data files
+        with open(path, "rb") as f:
+            head = f.read(512).lstrip()
+        if head.startswith(b"<!DOCTYPE html") or head.startswith(b"<html"):
+            raise ValueError(
+                "The dataset appears to be an HTML page (likely a Google Drive interstitial). "
+                "Please ensure you downloaded the actual data file."
+            )
+
+        if suffix in [".csv", ".txt"]:
+            # Handles compressed CSVs too by extension (e.g., .csv.gz recognized by pandas)
+            return pd.read_csv(path)
+        elif suffix in [".parquet", ".pq"]:
+            # Requires pyarrow or fastparquet
+            # You can specify engine="pyarrow" if desired
+            return pd.read_parquet(path)
+        elif suffix in [".xlsx", ".xls"]:
+            return pd.read_excel(path)
+        else:
+            raise ValueError(f"Unsupported file type: {suffix}. Supported: .csv, .parquet, .xlsx")
     
     async def _preprocess_data(self):
         """Perform basic data preprocessing."""
@@ -96,7 +128,7 @@ class DataProcessor:
         """Create useful derived features from the original data."""
         
         # Extract date components if eff_gas_day exists
-        if 'eff_gas_day' in self.data.columns and self.data['eff_gas_day'].dtype == 'datetime64[ns]':
+        if 'eff_gas_day' in self.data.columns and pd.api.types.is_datetime64_any_dtype(self.data['eff_gas_day']):
             self.data['year'] = self.data['eff_gas_day'].dt.year
             self.data['month'] = self.data['eff_gas_day'].dt.month
             self.data['day_of_week'] = self.data['eff_gas_day'].dt.dayofweek
