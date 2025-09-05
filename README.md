@@ -1,110 +1,164 @@
-### Pipeline Data Analysis Agent
+Pipeline Data Analysis Agent
 
-A sophisticated AI-powered data agent that can analyze pipeline data through natural language queries, detect anomalies, identify patterns, and provide insights with supporting evidence.
+A sophisticated AI-powered data agent that analyzes pipeline data through natural language queries, detects anomalies, identifies patterns, and provides insights with supporting evidence. Now includes advanced Pipeline Operations analytics (capacity, utilization, bottlenecks) and optional AIS vessel-traffic integration.
 
-#### Features
+Features
 
-- 🤖 Natural Language Interface: Ask questions in plain English about your pipeline data
-- 📊 Pattern Recognition: Automatically detect trends, correlations, and clustering in the data
-- 🚨 Anomaly Detection: Identify outliers and unusual patterns using multiple detection algorithms
-- 🔍 Causal Analysis: Propose plausible explanations for observed relationships with evidence
-- 📈 Advanced Analytics: Statistical analysis, time series analysis, and predictive modeling
-- 💬 Conversational Interface: CLI-based chat interface with rich formatting
+🤖 Natural Language Interface: Ask questions in plain English about your pipeline data
 
-### Quick Start
+📊 Pattern Recognition: Detect trends, correlations, and clustering
 
-#### Installation
+🚨 Anomaly Detection: Multiple methods (Z-score, IQR, Isolation Forest)
 
-1. Clone this repository:
-```bash
+🔍 Causal Analysis: Plausible explanations with supporting evidence
+
+📈 Advanced Analytics: Statistical summaries, time series patterns, clustering
+
+🛠️ Pipeline Operations: Capacity inference, utilization, bottlenecks, flow-direction anomalies
+
+🚢 AIS Integration (optional): Overlay nearby tanker/vessel activity near terminals
+
+💬 Conversational CLI: Rich, chat-like terminal interface
+
+Quick Start
+Installation
+Clone this repository:
 git clone https://github.com/rmkenv/projectgamma
 cd projectgamma
-```
 
-2. Install dependencies:
-```bash
+Install dependencies:
 pip install -r requirements.txt
-```
+
+
 Note: For Parquet datasets, pandas uses pyarrow (recommended). Ensure pyarrow is installed via requirements.txt.
 
-3. Set up your Anthropic API key:
-```bash
-export ANTHROPIC_API_KEY="your-api-key-here"
-```
+Optional (for pipeline operations & geospatial features):
 
-#### Dataset Setup
+# Geospatial stack (recommended for spatial joins/buffer operations)
+pip install geopandas shapely rtree
+
+Set up your Anthropic API key:
+export ANTHROPIC_API_KEY="your-api-key-here"
+
+Dataset Setup
 
 This agent supports CSV and Parquet files. You’ll be prompted for the dataset path at runtime.
 
-- Example (Parquet on Colab):
-```bash
+Example (Parquet on Colab):
 python main.py
 # When prompted, enter: /content/pipeline_data.parquet
-```
 
-- Example (CSV locally):
-```bash
+Example (CSV locally):
 python main.py
 # When prompted, enter: /path/to/your/pipeline_data.csv
-```
+
 
 Tips:
-- Use absolute paths for reliability.
-- For Parquet, pyarrow must be installed (already included in requirements).
 
-If you need to fetch from Google Drive, download the actual file (not the HTML share page). Using gdown is recommended:
-```bash
+Use absolute paths for reliability.
+
+For Parquet, pyarrow must be installed (already included in requirements).
+
+If fetching from Google Drive, download the actual file (not the HTML share page). Using gdown is recommended:
+
 pip install gdown
 gdown https://drive.google.com/uc?id=<FILE_ID>
-```
 
-#### Usage
+Usage
 
 Start the agent:
-```bash
+
 python main.py
-```
+
 
 Example queries you can try:
 
-- Simple Retrieval:
-  - "How many pipeline records are there in 2024?"
-  - "Show me all pipelines in Texas"
-  - "What are the unique categories in the dataset?"
-- Pattern Recognition:
-  - "Find correlations between scheduled quantity and location"
-  - "Cluster pipelines by their characteristics"
-  - "Show trends in scheduled quantities over time"
-- Anomaly Detection:
-  - "Find outliers in scheduled quantities"
-  - "Detect unusual pipeline configurations"
-  - "Identify pipelines with suspicious delivery patterns"
-- Causal Analysis:
-  - "Why might certain pipelines have higher scheduled quantities?"
-  - "What factors could explain the geographic distribution of pipelines?"
-  - "Analyze the relationship between pipeline categories and delivery signs"
+Simple Retrieval:
 
-### Dataset Information
+"How many pipeline records are there in 2024?"
+
+"Show me all pipelines in Texas"
+
+"What are the unique categories in the dataset?"
+
+Pattern Recognition:
+
+"Find correlations between scheduled quantity and location"
+
+"Cluster pipelines by their characteristics"
+
+"Show trends in scheduled quantities over time"
+
+Anomaly Detection:
+
+"Find outliers in scheduled quantities"
+
+"Detect unusual pipeline configurations"
+
+"Identify pipelines with suspicious delivery patterns"
+
+Causal Analysis:
+
+"Why might certain pipelines have higher scheduled quantities?"
+
+"What factors could explain the geographic distribution of pipelines?"
+
+"Analyze the relationship between pipeline categories and delivery signs"
+
+Pipeline Operations (NEW):
+
+"Detect pipeline bottlenecks and capacity issues in TX"
+
+"Find pipelines with utilization > 85% in 2024"
+
+"Analyze flow direction anomalies by region"
+
+"Show capacity constraints near terminals"
+
+Pipeline Ops with AIS (NEW):
+
+"Find pipeline bottlenecks in Texas and show nearby tanker vessels from AIS in the last 30 days"
+
+"Analyze capacity utilization by region and overlay AIS tanker traffic near terminals"
+
+"Detect flow direction anomalies and list any vessels within 20 km of affected nodes (use AIS)"
+
+"Which terminals had recurring bottlenecks last month, and what AIS tanker activity was nearby?"
+
+Tip: Include words like "tanker", "vessel", "AIS", or "shipping" to auto-enable AIS in the query.
+
+Dataset Information
 
 The pipeline dataset may include:
-- pipeline_name: Name of the pipeline
-- loc_name: Location name
-- connecting_pipeline: Connected pipeline information
-- connecting_entity: Connected entity details
-- rec_del_sign: Receive/delivery sign indicator
-- category_short: Short category code
-- country_name: Country name
-- state_abb: State abbreviation
-- county_name: County name
-- latitude, longitude: Geographic coordinates
-- eff_gas_day: Effective gas day (date)
-- scheduled_quantity: Scheduled gas quantity
 
-### Configuration
+pipeline_name: Name of the pipeline
+
+loc_name: Location name
+
+connecting_pipeline: Connected pipeline information
+
+connecting_entity: Connected entity details
+
+rec_del_sign: Receive/delivery sign indicator
+
+category_short: Short category code
+
+country_name: Country name
+
+state_abb: State abbreviation
+
+county_name: County name
+
+latitude, longitude: Geographic coordinates (may be missing in some datasets)
+
+eff_gas_day: Effective gas day (date)
+
+scheduled_quantity: Scheduled gas quantity
+
+Configuration
 
 You can customize behavior in config/config.yaml:
 
-```yaml
 agent:
   model: "claude-3-5-sonnet-20241022"
   max_tokens: 4000
@@ -120,31 +174,40 @@ analysis:
   clustering_min_samples: 5
   correlation_threshold: 0.5
   max_display_rows: 20
-```
 
-Note: The default main.py prompts for a local dataset path. If you re-enable auto-download, ensure the URL points directly to the file (or use gdown for Drive).
+pipeline_analytics:
+  utilization_threshold: 0.85
+  bottleneck_window_days: 30
+  bottleneck_min_days: 10
+  max_tanker_distance_km: 20
+  ais_stream_duration: 30
+  enable_ais_integration: false
 
-### Architecture
 
-```
+Notes:
+
+The default main.py prompts for a local dataset path. If you re-enable auto-download, ensure the URL points directly to the file (or use gdown for Drive).
+
+Set pipeline_analytics.enable_ais_integration: true to allow AIS lookups. Queries mentioning "tanker", "vessel", "AIS", or "shipping" will request AIS data.
+
+Architecture
 data_agent/
 ├── core/
-│   ├── agent.py              # Main agent orchestration
-│   ├── data_processor.py     # Data loading and preprocessing (CSV/Parquet auto-detect)
-│   ├── query_parser.py       # Natural language query parsing
-│   └── analysis_engine.py    # Statistical and ML analysis
+│   ├── agent.py               # Main agent orchestration
+│   ├── data_processor.py      # Data loading & preprocessing (CSV/Parquet)
+│   ├── query_parser.py        # NL query parsing w/ pipeline ops + AIS intent
+│   └── analysis_engine.py     # Statistical/ML analysis + pipeline operations
+├── analysis/
+│   └── pipeline_analytics.py  # Capacity, utilization, bottlenecks, flow anomalies, AIS
 ├── models/
-│   ├── query_models.py       # Pydantic models for queries
-│   └── response_models.py    # Pydantic models for responses
+│   ├── query_models.py        # Pydantic models for queries
+│   └── response_models.py     # Pydantic models for responses
 └── utils/
-    ├── anthropic_client.py   # Anthropic API client
-    ├── data_utils.py         # Data utility functions
-    └── logger.py             # Logging configuration
-```
+    ├── anthropic_client.py    # Anthropic API client
+    ├── data_utils.py          # Data utility functions
+    └── logger.py              # Logging configuration
 
-### Example Interactions
-
-```
+Example Interactions
 🤖 Pipeline Data Agent Ready! Ask me anything about your pipeline data.
 
 You: Find anomalies in scheduled quantities
@@ -174,35 +237,81 @@ Key Findings:
 - Category 'LNG' shows the highest anomaly rate (8.7%)
 
 Would you like me to investigate any specific anomalies further?
-```
 
-### Advanced Features
+Advanced Features
 
-- Multi-step Analysis:
-  - The agent chains steps (detect anomalies, cluster geography, test spatial correlation) for complex questions.
+Multi-step Analysis:
 
-- Evidence-Based Responses:
-  - Methodology, data selection, statistical evidence, and limitations are included in responses.
+The agent chains steps (e.g., detect anomalies → cluster geography → test spatial correlation) for complex questions.
 
-- Conversation Memory:
-  - The agent remembers recent context within a session to refine follow-up queries.
+Evidence-Based Responses:
 
-### Limitations
+Methodology, data selection, statistical evidence, and limitations are included in responses.
 
-- Data Quality: Results depend on data quality; missing/inconsistent data are surfaced.
-- Causality: Causal statements are hypotheses, not definitive proof.
-- Model Limitations: Detection accuracy varies across datasets and outlier types.
-- API Costs: Complex analyses may require multiple API calls.
+Conversation Memory:
 
-### Development
+The agent remembers recent context within a session to refine follow-up queries.
 
-#### Running Tests
-```bash
+Pipeline Operations Suite:
+
+Capacity inference and utilization scoring
+
+Bottleneck detection over configurable rolling windows
+
+Flow-direction anomaly checks
+
+Optional AIS overlay to enrich context around terminals and high-traffic regions
+
+Prerequisites & Performance
+
+Large Datasets: For 20M+ rows, enable preprocessing optimizations (categoricals, selective columns, chunking if needed). Memory use is surfaced in summaries.
+
+Geospatial: geopandas, shapely, and rtree (optional) improve spatial operations. Without them, AIS/spatial features gracefully degrade to simpler proximity checks.
+
+AIS: Set enable_ais_integration: true and mention "tanker", "vessel", "AIS", or "shipping" in your query.
+
+Limitations
+
+Data Quality: Results depend on data quality; missing/inconsistent data are surfaced.
+
+Causality: Causal statements are hypotheses, not proofs.
+
+Model Limitations: Detection accuracy varies across datasets and outlier types.
+
+API Costs: Complex analyses may require multiple API calls.
+
+Real-time Streams: Continuous AIS can be resource-intensive; set sensible durations.
+
+Troubleshooting
+
+"No API key found"
+
+Ensure ANTHROPIC_API_KEY is set in your environment
+
+"Dataset not found"
+
+Check the file path when prompted; use absolute paths if possible
+
+"Failed to load data" or codec errors
+
+Ensure the file format matches its extension (CSV vs Parquet)
+
+For Parquet, ensure pyarrow is installed
+
+"Loaded 0 rows" when using a Google Drive URL
+
+You likely downloaded an HTML interstitial page
+
+Use gdown or obtain a direct download link
+
+Performance Issues
+
+For very large datasets, consider sampling or selecting columns in your query
+Development
+Running Tests
 pytest tests/
-```
 
-#### Code Quality
-```bash
+Code Quality
 # Format code
 black data_agent/
 
@@ -211,42 +320,29 @@ mypy data_agent/
 
 # Linting
 flake8 data_agent/
-```
 
-#### Adding New Analysis Methods
+Adding New Analysis Methods
 
-1. Add your method to analysis_engine.py
-2. Update the query parser to recognize relevant keywords
-3. Add appropriate response models
-4. Write tests
+Add your method to analysis_engine.py (or analysis/pipeline_analytics.py for pipeline ops)
 
-### Troubleshooting
+Update query_parser.py to recognize relevant keywords/intent
 
-- "No API key found"
-  - Ensure ANTHROPIC_API_KEY is set in your environment
+Add appropriate response models
 
-- "Dataset not found"
-  - Check the file path when prompted; use absolute paths if possible
+Write tests
 
-- "Failed to load data" or codec errors
-  - Ensure the file format matches its extension (CSV vs Parquet)
-  - For Parquet, ensure pyarrow is installed
+Contributing
 
-- "Loaded 0 rows" when using a Google Drive URL
-  - You likely downloaded an HTML interstitial page
-  - Use gdown or obtain a direct download link
+Fork the repository
 
-- Performance Issues
-  - For very large datasets, consider sampling or column selection
+Create a feature branch
 
-### Contributing
+Add tests for new functionality
 
-1. Fork the repository
-2. Create a feature branch
-3. Add tests for new functionality
-4. Ensure code quality checks pass
-5. Submit a pull request
+Ensure code quality checks pass
 
-### License
+Submit a pull request
+
+License
 
 MIT License - see LICENSE file for details.
