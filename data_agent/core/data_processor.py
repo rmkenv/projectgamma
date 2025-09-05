@@ -1,5 +1,5 @@
 
- # Data processing and loading utilities for pipeline datasets.
+#Data processing and loading utilities for pipeline datasets.
 
 
 import pandas as pd
@@ -30,6 +30,17 @@ class DataProcessor:
         self.data = None
         self.original_data = None
         self.column_info = {}
+        self.geo_features_available = False
+        
+        # Missing value handling config
+        self.missing_config = config.get('preprocessing', {
+            'drop_geo_if_all_missing': True,
+            'drop_sched_qty_missing': True,
+            'impute_categories_with_unknown': True,
+            'add_missing_indicators': True,
+            'convert_text_to_categorical': True,
+            'high_missing_threshold': 0.6  # Drop columns with >60% missing
+        })
         
     async def load_data(self):
         """Load and preprocess the pipeline dataset."""
@@ -41,6 +52,9 @@ class DataProcessor:
             self.original_data = self.data.copy()
             
             logger.info(f"Loaded {len(self.data)} rows and {len(self.data.columns)} columns")
+            
+            # Handle missing values first
+            self._handle_missing_values()
             
             # Preprocess the data
             await self._preprocess_data()
@@ -85,6 +99,162 @@ class DataProcessor:
             return pd.read_excel(path)
         else:
             raise ValueError(f"Unsupported file type: {suffix}. Supported: .csv, .parquet, .xlsx")
+
+    def _handle_missing_values(self):
+        """
+        Comprehensive missing value handling strategy.
+        """
+        logger.info("Handling missing values...")
+        df = self.data
+        initial_rows = len(df)
+        initial_cols = len(df.columns)
+        
+        # 1) Analyze missing patterns
+        missing_summary = {}
+        for col in df.columns:
+            missing_count = df[col].isna().sum()
+            missing_rate = missing_count / len(df)
+            missing_summary[col] = {
+                'count': missing_count,
+                'rate': missing_rate
+            }
+        
+        # Log significant missing values
+        significant_missing = {k: v['count'] for k, v in missing_summary.items() if v['count'] > 0}
+        if significant_missing:
+            logger.warning(f"Missing values found: {significant_missing}")
+        
+        # 2) Drop columns with extremely high missing rates
+        cols_to_drop = []
+        for col, info in missing_summary.items():
+            if info['rate'] >= self.missing_config['high_missing_threshold']:
+                cols_to_drop.append(col)
+                logger.info(f"Dropping column '{col}' due to high missing rate: {info['rate']:.1%}")
+        
+        if cols_to_drop:
+            df.drop(columns=cols_to_drop, inplace=True)
+        
+        # 3) Handle geographic columns specifically
+        geo_cols = ["latitude", "longitude"]
+        geo_missing_rates = {}
+        for col in geo_cols:
+            if col in df.columns:
+                geo_missing_rates[col] = df[col].isna().mean()
+        
+        if self.missing_config['drop_geo_if_all_missing']:
+            geo_unusable = all(rate >= 0.999 for rate in geo_missing_rates.values())
+            if geo_unusable and geo_cols[0] in df.columns:
+                logger.info("Dropping geographic columns due to complete missingness")
+                df.drop(columns=[col for col in geo_cols if col in df.columns], inplace=True)
+                self.geo_features_available = False
+            else:
+                self.geo_features_available = all(col in df.columns for col in geo_cols)
+        else:
+            self.geo_features_available = all(col in df.columns for col in geo_cols)
+        
+        # 4) Handle connecting_pipeline (typically very high missing)
+        if "connecting_pipeline" in df.columns:
+            miss_rate = df["connecting_pipeline"].isna().mean()
+            if miss_rate >= self.missing_config['high_missing_threshold']:
+                logger.info(f"Dropping 'connecting_pipeline' due to high missing rate: {miss_rate:.1%}")
+                df.drop(columns=["connecting_pipeline"], inplace=True)
+            else:
+                if self.missing_config['add_missing_indicators']:
+                    df["connecting_pipeline_missing"] = df["connecting_pipeline"].isna()
+                if self.missing_config['impute_categories_with_unknown']:
+                    df["connecting_pipeline"] = df["connecting_pipeline"].fillna("None")
+        
+        # 5) Handle other categorical columns with moderate missing
+        categorical_impute_cols = [
+            "connecting_entity", "category_short", "state_abb", "county_name"
+        ]
+        
+        for col in categorical_impute_cols:
+            if col in df.columns:
+                missing_count = df[col].isna().sum()
+                if missing_count > 0:
+                    if self.missing_config['add_missing_indicators']:
+                        df[f"{col}_missing"] = df[col].isna()
+                    
+                    if self.missing_config['impute_categories_with_unknown']:
+                        # Use appropriate fill value based on column
+                        fill_value = "Unknown"
+                        if col == "state_abb":
+                            fill_value = "UNK"
+                        elif col == "connecting_entity":
+                            fill_value = "Unknown"
+                        
+                        df[col] = df[col].fillna(fill_value)
+                        logger.info(f"Imputed {missing_count} missing values in '{col}' with '{fill_value}'")
+        
+        # 6) Handle scheduled_quantity (critical numeric column)
+        if "scheduled_quantity" in df.columns:
+            missing_count = df["scheduled_quantity"].isna().sum()
+            if missing_count > 0:
+                if self.missing_config['drop_sched_qty_missing']:
+                    # Drop rows with missing scheduled_quantity
+                    before_rows = len(df)
+                    df.dropna(subset=["scheduled_quantity"], inplace=True)
+                    after_rows = len(df)
+                    dropped_rows = before_rows - after_rows
+                    logger.info(f"Dropped {dropped_rows} rows with missing scheduled_quantity")
+                else:
+                    # Advanced imputation: groupwise median
+                    if self.missing_config['add_missing_indicators']:
+                        df["scheduled_quantity_missing"] = df["scheduled_quantity"].isna()
+                    
+                    # Try groupwise imputation by pipeline and weekday
+                    if "eff_gas_day" in df.columns and "pipeline_name" in df.columns:
+                        try:
+                            df["eff_gas_day"] = pd.to_datetime(df["eff_gas_day"], errors='coerce')
+                            weekday = df["eff_gas_day"].dt.weekday
+                            grp_median = df.groupby(["pipeline_name", weekday])["scheduled_quantity"].transform("median")
+                            global_median = df["scheduled_quantity"].median()
+                            
+                            df["scheduled_quantity"] = df["scheduled_quantity"].fillna(grp_median).fillna(global_median)
+                            logger.info(f"Imputed {missing_count} missing scheduled_quantity values using groupwise median")
+                        except Exception as e:
+                            # Fallback to simple median
+                            global_median = df["scheduled_quantity"].median()
+                            df["scheduled_quantity"] = df["scheduled_quantity"].fillna(global_median)
+                            logger.warning(f"Fallback imputation for scheduled_quantity: {e}")
+                    else:
+                        # Simple median imputation
+                        global_median = df["scheduled_quantity"].median()
+                        df["scheduled_quantity"] = df["scheduled_quantity"].fillna(global_median)
+                        logger.info(f"Imputed {missing_count} missing scheduled_quantity values with median")
+        
+        # 7) Convert text columns to categorical to save memory
+        if self.missing_config['convert_text_to_categorical']:
+            cat_candidates = [
+                "pipeline_name", "loc_name", "connecting_entity",
+                "category_short", "state_abb", "county_name", "rec_del_sign", "country_name"
+            ]
+            
+            for col in cat_candidates:
+                if col in df.columns and df[col].dtype == object:
+                    unique_count = df[col].nunique()
+                    # Only convert if reasonable cardinality (avoid memory issues with too many categories)
+                    if unique_count < len(df) * 0.5:  # Less than 50% unique values
+                        df[col] = df[col].astype("category")
+                        logger.debug(f"Converted '{col}' to categorical ({unique_count} unique values)")
+        
+        # Update data
+        self.data = df
+        
+        # Log summary of changes
+        final_rows = len(df)
+        final_cols = len(df.columns)
+        logger.info(f"Missing value handling complete: {initial_rows} -> {final_rows} rows, {initial_cols} -> {final_cols} columns")
+        
+        # Final missing value check
+        remaining_missing = df.isnull().sum().sum()
+        if remaining_missing > 0:
+            remaining_by_col = df.isnull().sum()
+            remaining_by_col = remaining_by_col[remaining_by_col > 0]
+            logger.info(f"Remaining missing values: {remaining_missing} total, by column: {remaining_by_col.to_dict()}")
+        else:
+            logger.info("No missing values remaining after preprocessing")
     
     async def _preprocess_data(self):
         """Perform basic data preprocessing."""
@@ -97,7 +267,7 @@ class DataProcessor:
             except Exception as e:
                 logger.warning(f"Could not convert eff_gas_day to datetime: {e}")
         
-        # Convert numeric columns
+        # Convert numeric columns (only if they still exist after missing value handling)
         numeric_columns = ['scheduled_quantity', 'latitude', 'longitude']
         for col in numeric_columns:
             if col in self.data.columns:
@@ -105,21 +275,6 @@ class DataProcessor:
                     self.data[col] = pd.to_numeric(self.data[col], errors='coerce')
                 except Exception as e:
                     logger.warning(f"Could not convert {col} to numeric: {e}")
-        
-        # Handle categorical columns
-        categorical_columns = [
-            'pipeline_name', 'loc_name', 'connecting_pipeline', 'connecting_entity',
-            'rec_del_sign', 'category_short', 'country_name', 'state_abb', 'county_name'
-        ]
-        
-        for col in categorical_columns:
-            if col in self.data.columns:
-                self.data[col] = self.data[col].astype('category')
-        
-        # Log data quality issues
-        missing_counts = self.data.isnull().sum()
-        if missing_counts.sum() > 0:
-            logger.warning(f"Missing values found: {missing_counts[missing_counts > 0].to_dict()}")
         
         # Create derived features
         await self._create_derived_features()
@@ -136,7 +291,7 @@ class DataProcessor:
             
             logger.info("Created date-based derived features")
         
-        # Create quantity categories if scheduled_quantity exists
+        # Create quantity categories if scheduled_quantity exists and has valid data
         if 'scheduled_quantity' in self.data.columns:
             try:
                 quantity_col = self.data['scheduled_quantity'].dropna()
@@ -152,26 +307,32 @@ class DataProcessor:
             except Exception as e:
                 logger.warning(f"Could not create quantity categories: {e}")
         
-        # Create location-based features
-        if 'latitude' in self.data.columns and 'longitude' in self.data.columns:
+        # Create location-based features only if geo data is available
+        if self.geo_features_available and 'latitude' in self.data.columns and 'longitude' in self.data.columns:
             try:
-                # Create geographic regions (simplified)
-                lat_median = self.data['latitude'].median()
-                lon_median = self.data['longitude'].median()
-                
-                conditions = [
-                    (self.data['latitude'] >= lat_median) & (self.data['longitude'] >= lon_median),
-                    (self.data['latitude'] >= lat_median) & (self.data['longitude'] < lon_median),
-                    (self.data['latitude'] < lat_median) & (self.data['longitude'] >= lon_median),
-                    (self.data['latitude'] < lat_median) & (self.data['longitude'] < lon_median)
-                ]
-                choices = ['NE', 'NW', 'SE', 'SW']
-                
-                self.data['geographic_quadrant'] = np.select(conditions, choices, default='Unknown')
-                logger.info("Created geographic quadrant feature")
-                
+                # Only create features if we have sufficient non-null geo data
+                geo_data = self.data[['latitude', 'longitude']].dropna()
+                if len(geo_data) > 0:
+                    lat_median = geo_data['latitude'].median()
+                    lon_median = geo_data['longitude'].median()
+                    
+                    conditions = [
+                        (self.data['latitude'] >= lat_median) & (self.data['longitude'] >= lon_median),
+                        (self.data['latitude'] >= lat_median) & (self.data['longitude'] < lon_median),
+                        (self.data['latitude'] < lat_median) & (self.data['longitude'] >= lon_median),
+                        (self.data['latitude'] < lat_median) & (self.data['longitude'] < lon_median)
+                    ]
+                    choices = ['NE', 'NW', 'SE', 'SW']
+                    
+                    self.data['geographic_quadrant'] = np.select(conditions, choices, default='Unknown')
+                    logger.info("Created geographic quadrant feature")
+                else:
+                    logger.info("Skipped geographic features due to insufficient valid coordinate data")
+                    
             except Exception as e:
                 logger.warning(f"Could not create geographic features: {e}")
+        else:
+            logger.info("Skipped geographic features (coordinates not available)")
     
     def _analyze_columns(self):
         """Analyze column characteristics and data types."""
@@ -222,7 +383,8 @@ class DataProcessor:
             'columns': list(self.data.columns),
             'dtypes': {col: str(dtype) for col, dtype in self.data.dtypes.items()},
             'missing_values': self.data.isnull().sum().sum(),
-            'memory_usage': f"{self.data.memory_usage(deep=True).sum() / 1024**2:.2f} MB"
+            'memory_usage': f"{self.data.memory_usage(deep=True).sum() / 1024**2:.2f} MB",
+            'geo_features_available': self.geo_features_available
         }
         
         # Add date range if available
@@ -297,3 +459,41 @@ class DataProcessor:
         unique_vals = [str(val) for val in unique_vals[:limit]]
         
         return sorted(unique_vals)
+
+    def get_missing_value_report(self) -> Dict[str, Any]:
+        """Generate a comprehensive missing value report."""
+        if self.data is None:
+            return {"error": "No data loaded"}
+        
+        missing_info = {}
+        total_rows = len(self.data)
+        
+        for col in self.data.columns:
+            missing_count = self.data[col].isnull().sum()
+            missing_rate = missing_count / total_rows
+            
+            missing_info[col] = {
+                'missing_count': int(missing_count),
+                'missing_rate': float(missing_rate),
+                'non_missing_count': int(total_rows - missing_count),
+                'data_type': str(self.data[col].dtype)
+            }
+        
+        # Summary statistics
+        total_missing = sum(info['missing_count'] for info in missing_info.values())
+        total_cells = total_rows * len(self.data.columns)
+        
+        report = {
+            'column_details': missing_info,
+            'summary': {
+                'total_rows': total_rows,
+                'total_columns': len(self.data.columns),
+                'total_cells': total_cells,
+                'total_missing_values': total_missing,
+                'overall_missing_rate': total_missing / total_cells if total_cells > 0 else 0,
+                'columns_with_missing': sum(1 for info in missing_info.values() if info['missing_count'] > 0),
+                'geo_features_available': self.geo_features_available
+            }
+        }
+        
+        return report
