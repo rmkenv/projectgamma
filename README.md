@@ -17,8 +17,8 @@ A sophisticated AI-powered data agent that can analyze pipeline data through nat
 
 1. Clone this repository:
 ```bash
-git clone <your-repo-url>
-cd pipeline-data-agent
+git clone https://github.com/rmkenv/projectgamma
+cd projectgamma
 ```
 
 2. Install dependencies:
