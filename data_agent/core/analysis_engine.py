@@ -1,5 +1,6 @@
-
-# Advanced analysis engine for statistical analysis, anomaly detection, and pattern recognition.
+"""
+Advanced analysis engine for statistical analysis, anomaly detection, and pattern recognition.
+"""
 
 import pandas as pd
 import numpy as np
@@ -15,6 +16,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 from ..utils.logger import get_logger
+from ..analysis.pipeline_analytics import PipelineAnalytics
 
 logger = get_logger()
 
@@ -22,7 +24,7 @@ logger = get_logger()
 class AnalysisEngine:
     """
     Performs various types of data analysis including statistical analysis,
-    anomaly detection, pattern recognition, and clustering.
+    anomaly detection, pattern recognition, clustering, and advanced pipeline analytics.
     """
     
     def __init__(self, data: pd.DataFrame, config: Dict[str, Any]):
@@ -31,6 +33,9 @@ class AnalysisEngine:
         self.config = config
         self.scaler = StandardScaler()
         self.label_encoders = {}
+        
+        # Initialize pipeline analytics
+        self.pipeline_analytics = PipelineAnalytics(config)
         
     def execute_simple_query(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Execute simple data queries like filtering, counting, aggregation."""
@@ -56,7 +61,7 @@ class AnalysisEngine:
             results['column_count'] = len(filtered_data.columns)
             
             # Sample data
-            max_display = self.config.get('max_display_rows', 20)
+            max_display = self.config.get('analysis', {}).get('max_display_rows', 20)
             results['sample_data'] = filtered_data.head(max_display).to_dict('records')
             
             # Summary statistics for numeric columns
@@ -366,6 +371,43 @@ class AnalysisEngine:
             logger.error(f"Causal analysis failed: {e}")
             return {'error': str(e), 'success': False}
     
+    async def analyze_pipeline_operations(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Advanced pipeline operations analysis with bottleneck detection and AIS integration."""
+        try:
+            logger.info("Starting pipeline operations analysis")
+            
+            # Check if AIS data collection is requested
+            collect_ais = params.get('include_ais_data', False)
+            
+            # Enable AIS only if explicitly requested and configured
+            if collect_ais and not self.config.get('pipeline_analytics', {}).get('enable_ais_integration', False):
+                collect_ais = False
+                logger.warning("AIS integration disabled in config")
+            
+            # Apply filters to data first
+            filtered_data = self._apply_filters(params.get('filters', {}))
+            
+            # Run comprehensive pipeline analysis
+            results = await self.pipeline_analytics.run_comprehensive_analysis(
+                filtered_data, collect_ais=collect_ais
+            )
+            
+            # Add metadata
+            results['analysis_type'] = 'pipeline_operations'
+            results['data_rows_analyzed'] = len(filtered_data)
+            results['filters_applied'] = params.get('filters', {})
+            
+            logger.info("Pipeline operations analysis completed")
+            return results
+            
+        except Exception as e:
+            logger.error(f"Pipeline operations analysis failed: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'analysis_type': 'pipeline_operations'
+            }
+    
     def general_analysis(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Perform general exploratory data analysis."""
         
@@ -409,7 +451,7 @@ class AnalysisEngine:
             logger.error(f"General analysis failed: {e}")
             return {'error': str(e), 'success': False}
     
-    # Helper methods
+    # Helper methods (keeping all your existing helper methods)
     
     def _apply_filters(self, filters: Dict[str, Any]) -> pd.DataFrame:
         """Apply filters to the data."""
@@ -493,7 +535,7 @@ class AnalysisEngine:
         """Detect anomalies using Isolation Forest."""
         
         try:
-            contamination = self.config.get('anomaly_contamination', 0.1)
+            contamination = self.config.get('analysis', {}).get('anomaly_contamination', 0.1)
             
             # Standardize the data
             scaled_data = self.scaler.fit_transform(data[columns])
@@ -656,7 +698,7 @@ class AnalysisEngine:
         """Find strong correlations between variables."""
         
         strong_correlations = []
-        threshold = self.config.get('correlation_threshold', 0.5)
+        threshold = self.config.get('analysis', {}).get('correlation_threshold', 0.5)
         
         # Get upper triangle to avoid duplicates
         mask = np.triu(np.ones_like(pearson_corr, dtype=bool), k=1)
