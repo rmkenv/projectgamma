@@ -10,6 +10,7 @@ import sys
 import os
 from pathlib import Path
 import click
+import gdown
 from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
