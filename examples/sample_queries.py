@@ -1,7 +1,6 @@
-"""
-Example queries and expected outputs for the Pipeline Data Agent.
-Use these as templates for testing and demonstration.
-"""
+
+# Example queries and expected outputs for the Pipeline Data Agent. Use these as templates for testing and demonstration.
+
 
 # Simple data queries
 SIMPLE_QUERIES = [
