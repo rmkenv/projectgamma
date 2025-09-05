@@ -22,20 +22,20 @@ A sophisticated AI-powered data agent that analyzes pipeline data through natura
 Installation
 Clone this repository:
 
-```git clone https://github.com/rmkenv/projectgamma
-cd projectgamma```
+```git clone https://github.com/rmkenv/projectgamma```
+```cd projectgamma```
 
 Install dependencies:
 
-pip install -r requirements.txt
+```pip install -r requirements.txt```
 Note: For Parquet datasets, pandas uses pyarrow (recommended). Ensure it’s installed via requirements.txt.
 
 Optional (for pipeline operations & geospatial features):
 
-pip install geopandas shapely rtree
+```pip install geopandas shapely rtree```
 Set up your Anthropic API key:
 
-export ANTHROPIC_API_KEY="your-api-key-here"
+```export ANTHROPIC_API_KEY="your-api-key-here"```
 Dataset Setup
 This agent supports CSV and Parquet files. You’ll be prompted for the dataset path at runtime.
 
@@ -55,8 +55,8 @@ For Parquet, ensure pyarrow is installed.
 
 If fetching from Google Drive:
 
-pip install gdown
-gdown https://drive.google.com/uc?id=<FILE_ID>
+```pip install gdown```
+```gdown https://drive.google.com/uc?id=<FILE_ID>```
 🎯 Usage
 Start the agent:
 
