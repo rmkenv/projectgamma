@@ -1,4 +1,4 @@
-Pipeline Data Analysis Agent
+### Pipeline Data Analysis Agent
 A sophisticated AI-powered data agent that analyzes pipeline data through natural language queries, detects anomalies, identifies patterns, and provides insights with supporting evidence. Now includes advanced Pipeline Operations analytics (capacity, utilization, bottlenecks) and optional AIS vessel-traffic integration.
 
 🚀 Features
