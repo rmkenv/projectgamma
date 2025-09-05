@@ -233,11 +233,6 @@ Based on the analysis of **6,537,698 pipeline records** from 2024, here are the 
 - Enhance scheduling during winter peak  
 
 
-👉 This would sit right under your Example Interactions section, giving a detailed showcase of a realistic agent response with AIS integration and making the README even stronger.
-
-Want me to also add a collapsible <details> block (so the long report can be toggled open/closed) to keep the README concise?
-
-
 🔧 Development
 Running Tests
 pytest tests/
