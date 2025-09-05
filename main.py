@@ -117,4 +117,84 @@ async def run_agent(dataset_path, auto_download, config_path):
     
     # Display dataset info
     info = await agent.get_dataset_info()
-    console.print(Panel(info, title="Dataset Information", border
+    console.print(Panel(info, title="Dataset Information", border_style="green"))
+    
+    # Start chat interface
+    console.print(
+        Panel(
+            "[cyan]🎯 Ready for your questions![/cyan]\n\n"
+            "Try asking:\n"
+            "• 'Find anomalies in scheduled quantities'\n"
+            "• 'Show correlations between location and quantities'\n"
+            "• 'Cluster pipelines by characteristics'\n"
+            "• 'What patterns do you see in the data?'\n\n"
+            "[dim]Type 'help' for more examples, 'quit' to exit[/dim]",
+            title="Getting Started",
+            border_style="cyan"
+        )
+    )
+    
+    # Main chat loop
+    while True:
+        try:
+            # Get user input
+            user_input = console.input("\n[bold cyan]You:[/bold cyan] ").strip()
+            
+            if not user_input:
+                continue
+                
+            if user_input.lower() in ['quit', 'exit', 'q']:
+                break
+                
+            if user_input.lower() == 'help':
+                show_help()
+                continue
+                
+            if user_input.lower() == 'clear':
+                console.clear()
+                continue
+                
+            # Process query
+            console.print("\n[yellow]🤔 Thinking...[/yellow]")
+            
+            response = await agent.process_query(user_input)
+            
+            # Display response
+            console.print(f"\n[bold green]🤖 Agent:[/bold green]\n{response}")
+            
+        except KeyboardInterrupt:
+            break
+        except Exception as e:
+            logger.error(f"Query processing error: {e}")
+            console.print(f"\n[red]❌ Error processing query: {e}[/red]")
+
+def show_help():
+    """Display help information."""
+    help_text = """[bold]Available Commands:[/bold]
+    
+🔍 [cyan]Query Examples:[/cyan]
+    • \"How many pipelines are in Texas?\"
+    • \"Find outliers in scheduled quantities\"
+    • \"Show correlation between state and delivery sign\"
+    • \"Cluster pipelines by location and category\"
+    • \"What's unusual about the data from 2024?\"
+    • \"Analyze patterns in gas deliveries by day\"
+    
+📊 [cyan]Analysis Types:[/cyan]
+    • Pattern Recognition: trends, correlations, clustering
+    • Anomaly Detection: outliers, unusual patterns
+    • Causal Analysis: explanations with evidence
+    • Statistical Analysis: counts, averages, distributions
+    
+⌨️ [cyan]Commands:[/cyan]
+    • help - Show this help
+    • clear - Clear the screen  
+    • quit/exit/q - Exit the agent
+    
+💡 [dim]Tip: Be specific in your questions for better results![/dim]
+    """
+    
+    console.print(Panel(help_text, title="Help", border_style="blue"))
+
+if __name__ == "__main__":
+    main()
